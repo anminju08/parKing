@@ -58,20 +58,6 @@ async def summarize(req: SummarizeRequest = Body(...)):
     summary = ". ".join(sentences[: max(1, req.max_sentences)])
     return SummarizeResponse(summary=summary, original_length=len(text))
 
-# (2) 날씨 API -> 'get_weather' 도구로 변환됨
-@app.get(
-    "/api/weather",
-    response_model=WeatherResponse,
-    operation_id="get_weather",
-    tags=["API Tools"],
-)
-async def weather(city: str = Query("Seoul")):
-    """도시별 임시 날씨 데이터 반환"""
-    mock_data = {"Seoul": (22.3, "Cloudy"), "Busan": (24.1, "Sunny"), "Incheon": (21.0, "Rain")}
-    t, cond = mock_data.get(city, (20.0, "Unknown"))
-    return WeatherResponse(city=city, temp_c=t, condition=cond)
-
-# (3) 현재 시간 API -> 'current_time_tool' 도구로 변환됨
 @app.get(
     "/tools/current_time",
     response_model=TimeResponse,
