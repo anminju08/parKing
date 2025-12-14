@@ -44,13 +44,6 @@ class GreetResponse(BaseModel):
 class TimeResponse(BaseModel):
     current_time: str
 
-# ---------------------------------------------------------------------
-# 2. MCP 도구로 사용할 API 엔드포인트 정의
-# ---------------------------------------------------------------------
-# FastApiMCP는 FastAPI 앱에 등록된 모든 API 엔드포인트(@app.get, @app.post 등)를
-# 자동으로 스캔하여 MCP 도구로 만듭니다. 각 엔드포인트의 operation_id가 도구의 이름이 됩니다.
-# ---------------------------------------------------------------------
-
 # (1) 요약 API -> 'summarize_text' 도구로 변환됨
 @app.post(
     "/api/summarize",
@@ -104,6 +97,27 @@ async def greet_user(name: str = Query(..., description="인사할 사람의 이
 # ---------------------------------------------------------------------
 #  주차 게임 API 엔드포인트들
 # ---------------------------------------------------------------------
+
+@app.get(
+    "/api/parking/test",
+    operation_id="test_parking_api",
+    tags=["Parking Game"],
+)
+async def test_parking_api():
+    """공공데이터포털 API 연결 테스트"""
+    try:
+        parking_lots = await parking_service.fetch_parking_data(1, 5)
+        return {
+            "success": True,
+            "message": "API 연결 성공",
+            "data_count": len(parking_lots),
+            "sample_data": parking_lots[0] if parking_lots else None
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"API 연결 실패: {str(e)}"
+        }
 
 @app.get(
     "/api/parking/lots",

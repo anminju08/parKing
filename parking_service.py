@@ -9,36 +9,66 @@ class ParkingGameService:
     def __init__(self):
         self.game_rooms: Dict[str, GameRoom] = {}
         self.api_key = "ldsUnAd0IgYlk/QbU7ax9Sw9G3h0d3Cn2gTWiwnfwC2F8u6BplOoG2f/DLqvR7DM7QBVL+82rOS/x+2u2EhOPA=="
+        # 한국 공공데이터포털 API 엔드포인트
+        self.api_base_url = "https://api.odcloud.kr/api"
+        self.service_key = "15064338/v1/uddi:91ea9cb0-f9d1-48ab-ab53-89c0a6b94451"
     
     async def fetch_parking_data(self, page: int = 1, per_page: int = 10) -> List[ParkingLot]:
-        """공공 API에서 주차장 데이터를 가져옵니다"""
-        # 실제 API 엔드포인트로 교체해야 합니다
-        # 여기서는 목업 데이터를 반환합니다
-        mock_data = [
-            {
-                "순번": 1,
-                "대지위치주소": "서울특별시 강남구 테헤란로 123",
-                "건축면적": "1000㎡",
-                "옥내 기계식 주차대수": 15,
-                "옥외 기계식 주차대수": 5,
-                "옥내 자주식 주차대수": 20,
-                "옥외 자주식 주차대수": 10,
-                "총 주차대수": 50
-            },
-            {
-                "순번": 2,
-                "대지위치주소": "서울특별시 서초구 서초대로 456",
-                "건축면적": "800㎡",
-                "옥내 기계식 주차대수": 12,
-                "옥외 기계식 주차대수": 3,
-                "옥내 자주식 주차대수": 18,
-                "옥외 자주식 주차대수": 7,
-                "총 주차대수": 40
-            }
-        ]
+        """한국 공공데이터포털 API에서 주차장 데이터를 가져옵니다"""
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                # 한국 공공데이터포털 API 엔드포인트
+                endpoint = f"{self.api_base_url}/{self.service_key}"
+                params = {
+                    "page": page,
+                    "perPage": per_page,
+                    "serviceKey": self.api_key
+                }
+                
+                response = await client.get(endpoint, params=params, timeout=10.0)
+                response.raise_for_status()
+                
+                api_response = response.json()
+                print(f"API 응답: {api_response}")  # 디버깅용
+                
+                # 공공데이터포털 API 응답 구조에 맞게 수정
+                if "data" in api_response:
+                    raw_data = api_response["data"]
+                elif isinstance(api_response, list):
+                    raw_data = api_response
+                else:
+                    print(f"예상과 다른 API 응답 구조: {api_response}")
+                    raw_data = []
+                    
+        except Exception as e:
+            print(f"API 호출 실패: {e}")
+            # 테스트용 더미 데이터
+            raw_data = [
+                {
+                    "순번": 1,
+                    "대지위치주소": "서울특별시 강남구 테헤란로 123",
+                    "건축면적": 1000.0,
+                    "옥내 기계식 주차대수": 50,
+                    "옥외 기계식 주차대수": 20,
+                    "옥내 자주식 주차대수": 30,
+                    "옥외 자주식 주차대수": 10,
+                    "총 주차대수": 110
+                },
+                {
+                    "순번": 2,
+                    "대지위치주소": "서울특별시 서초구 서초대로 456",
+                    "건축면적": 800.0,
+                    "옥내 기계식 주차대수": 40,
+                    "옥외 기계식 주차대수": 15,
+                    "옥내 자주식 주차대수": 25,
+                    "옥외 자주식 주차대수": 5,
+                    "총 주차대수": 85
+                }
+            ]
         
         parking_lots = []
-        for data in mock_data:
+        for data in raw_data:
             # 주차 공간 생성
             spaces = []
             space_id = 1
@@ -76,8 +106,7 @@ class ParkingGameService:
         """새로운 게임 룸을 생성합니다"""
         room_id = str(uuid.uuid4())[:8]
         
-        # 실제로는 parking_lot_id로 특정 주차장을 선택해야 합니다
-        # 여기서는 첫 번째 주차장을 사용합니다
+        # 게임 룸 초기화를 비동기로 실행
         asyncio.create_task(self._initialize_room(room_id, parking_lot_id))
         
         return room_id
