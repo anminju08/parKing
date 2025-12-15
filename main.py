@@ -16,6 +16,7 @@ from models import (
     OccupySpaceResponse, GameStatsResponse
 )
 from parking_service import parking_service
+from ai_service import ai_service
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -43,6 +44,27 @@ class GreetResponse(BaseModel):
 
 class TimeResponse(BaseModel):
     current_time: str
+
+# AI 관련 모델들
+class AIRecommendationRequest(BaseModel):
+    query: str
+    max_results: int = 3
+
+class AIRecommendationResponse(BaseModel):
+    recommendation: str
+    search_results: list
+
+class AIChatRequest(BaseModel):
+    message: str
+
+class AIChatResponse(BaseModel):
+    response: str
+
+class AIStrategyResponse(BaseModel):
+    strategy: str
+    
+class AICommentaryResponse(BaseModel):
+    commentary: str
 
 # (1) 요약 API -> 'summarize_text' 도구로 변환됨
 @app.post(
@@ -190,6 +212,99 @@ async def get_parking_game_stats(room_id: str):
         raise HTTPException(status_code=404, detail="게임 룸을 찾을 수 없습니다")
     
     return GameStatsResponse(**stats)
+
+
+# ---------------------------------------------------------------------
+#  AI 기능 API 엔드포인트들 (LangChain/LLM/RAG)
+# ---------------------------------------------------------------------
+
+@app.post(
+    "/api/parking/ai/recommend",
+    response_model=AIRecommendationResponse,
+    operation_id="ai_parking_recommendation",
+    tags=["AI Features"],
+)
+async def ai_parking_recommendation(request: AIRecommendationRequest):
+    """AI 기반 주차장 추천 (RAG 활용)"""
+    # 현재 주차장 데이터 가져오기
+    parking_lots = await parking_service.fetch_parking_data(1, 50)
+    
+    # AI 추천 생성
+    recommendation = await ai_service.get_parking_recommendation(request.query, parking_lots)
+    
+    # RAG 검색 결과
+    search_results = await ai_service.search_parking_lots(request.query, request.max_results)
+    
+    return AIRecommendationResponse(
+        recommendation=recommendation,
+        search_results=search_results
+    )
+
+@app.post(
+    "/api/parking/ai/chat",
+    response_model=AIChatResponse,
+    operation_id="ai_parking_chat",
+    tags=["AI Features"],
+)
+async def ai_parking_chat(request: AIChatRequest):
+    """주차 어시스턴트 AI 채팅"""
+    parking_lots = await parking_service.fetch_parking_data(1, 50)
+    response = await ai_service.chat_with_parking_assistant(request.message, parking_lots)
+    
+    return AIChatResponse(response=response)
+
+@app.get(
+    "/api/parking/ai/strategy/{room_id}",
+    response_model=AIStrategyResponse,
+    operation_id="ai_game_strategy",
+    tags=["AI Features"],
+)
+async def ai_game_strategy(room_id: str, player_name: str = Query(..., description="플레이어 이름")):
+    """AI 게임 전략 코치"""
+    room = parking_service.get_game_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="게임 룸을 찾을 수 없습니다")
+    
+    strategy = await ai_service.generate_game_strategy(room, player_name)
+    
+    return AIStrategyResponse(strategy=strategy)
+
+@app.get(
+    "/api/parking/ai/commentary/{room_id}",
+    response_model=AICommentaryResponse,
+    operation_id="ai_game_commentary",
+    tags=["AI Features"],
+)
+async def ai_game_commentary(room_id: str):
+    """실시간 게임 해설 AI"""
+    room = parking_service.get_game_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="게임 룸을 찾을 수 없습니다")
+    
+    commentary = await ai_service.generate_game_commentary(room)
+    
+    return AICommentaryResponse(commentary=commentary)
+
+@app.get(
+    "/api/parking/ai/search",
+    operation_id="ai_parking_search",
+    tags=["AI Features"],
+)
+async def ai_parking_search(query: str = Query(..., description="검색 쿼리"), k: int = Query(3, description="결과 개수")):
+    """RAG 기반 주차장 검색"""
+    parking_lots = await parking_service.fetch_parking_data(1, 50)
+    
+    # 지식베이스 구축 (필요시)
+    await ai_service.build_parking_knowledge_base(parking_lots)
+    
+    # 검색 실행
+    results = await ai_service.search_parking_lots(query, k)
+    
+    return {
+        "query": query,
+        "results": results,
+        "total_found": len(results)
+    }
 
 
 # ---------------------------------------------------------------------
